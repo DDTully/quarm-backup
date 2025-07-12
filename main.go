@@ -17,11 +17,12 @@ func performBackup(dbUser, dbPass, dbName, dbHost, dbPort, targetDir string) err
 	backupFileName := fmt.Sprintf("%s_%s.sql", dbName, timestamp)
 	backupFilePath := filepath.Join(targetDir, backupFileName)
 
-	cmd := exec.Command("mysqldump",
+	cmd := exec.Command("mariadb-dump",
 		"--user="+dbUser,
 		"--password="+dbPass,
 		"--host="+dbHost,
 		"--port="+dbPort,
+		"--skip-ssl",
 		"--single-transaction",
 		"--routines",
 		"--triggers",
