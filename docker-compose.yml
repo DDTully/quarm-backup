@@ -8,10 +8,10 @@ services:
 
     env_file:
       - .env
-
     volumes:
       - ./database_backups:/app/backups
-
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     command:
       - "-user=${DB_USER}"
       - "-pass=${DB_PASS}"
