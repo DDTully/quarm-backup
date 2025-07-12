@@ -1,0 +1,24 @@
+services:
+  db-backup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: quarm-backup
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./database_backups:/app/backups
+
+    command:
+      - "-user=${DB_USER}"
+      - "-pass=${DB_PASS}"
+      - "-db=${DB_NAME}"
+      - "-host=${DB_HOST}"
+      - "-port=${DB_PORT}"
+      - "-dir=/app/backups"
+      - "-t=${BACKUP_MINUTES}"
+
+    restart: unless-stopped
