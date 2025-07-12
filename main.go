@@ -7,11 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
 func performBackup(dbUser, dbPass, dbName, dbHost, dbPort, targetDir string) error {
-	log.Printf("Starting backup of database '%s'...", dbName)
+	// log.Printf("Starting backup of database '%s'...", dbName)
 
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
 	backupFileName := fmt.Sprintf("%s_%s.sql", dbName, timestamp)
@@ -67,7 +68,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  -port string")
 	fmt.Fprintln(os.Stderr, "    \tDatabase port (default \"3306\")")
 	fmt.Fprintln(os.Stderr, "  -t int")
-	fmt.Fprintln(os.Stderr, "    \tTime in minutes to repeat the backup. If 0, runs only once.")
+	fmt.Fprintln(os.Stderr, "    \tInterval in minutes to repeat the backup. If 0, runs only once.")
 	fmt.Fprintln(os.Stderr)
 }
 
@@ -78,7 +79,7 @@ func main() {
 	targetDir := flag.String("dir", ".", "Target directory for the backup file")
 	dbHost := flag.String("host", "127.0.0.1", "Database host")
 	dbPort := flag.String("port", "3306", "Database port")
-	repeatMinutes := flag.Int("t", 0, "Cadence in minutes to repeat the backup")
+	repeatMinutes := flag.Int("t", 0, "Interval in minutes to repeat the backup")
 
 	flag.Usage = printUsage
 	flag.Parse()
@@ -105,23 +106,28 @@ func main() {
 			log.Fatalf("Fatal Error: Backup failed: %v", err)
 		}
 	} else {
-		log.Printf("Starting backup daemon to run every %d minute(s).", *repeatMinutes)
-		log.Println("Performing initial backup now...")
+		var backupMutex sync.Mutex
 
+		log.Println("Performing initial backup now...")
 		if err := performBackup(*dbUser, *dbPass, *dbName, *dbHost, *dbPort, *targetDir); err != nil {
 			log.Printf("ERROR: Initial backup failed: %v", err)
 		}
 
+		log.Printf("Starting backup daemon to run every %d minute(s).", *repeatMinutes)
 		ticker := time.NewTicker(time.Duration(*repeatMinutes) * time.Minute)
 		defer ticker.Stop()
-
-		log.Printf("Waiting %d minute(s). Press Ctrl+C to exit.", *repeatMinutes)
+		log.Printf("Scheduler Started. Waiting %d minute(s). Press Ctrl+C to exit.", *repeatMinutes)
 
 		for range ticker.C {
-			if err := performBackup(*dbUser, *dbPass, *dbName, *dbHost, *dbPort, *targetDir); err != nil {
-				log.Printf("ERROR: Scheduled backup failed: %v", err)
+			if backupMutex.TryLock() {
+				go func() {
+					defer backupMutex.Unlock()
+					if err := performBackup(*dbUser, *dbPass, *dbName, *dbHost, *dbPort, *targetDir); err != nil {
+						log.Printf("ERROR: Scheduled backup failed: %v", err)
+					}
+				}()
 			} else {
-				log.Printf("Waiting %d minute(s). Press Ctrl+C to exit.", *repeatMinutes)
+				log.Println("-> SKIPPING: Previous backup is still in progress.")
 			}
 		}
 	}
