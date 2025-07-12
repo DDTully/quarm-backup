@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 go build -o /app/db-backup .
 
 FROM alpine:latest
 
-RUN apk update && apk add --no-cache mariadb-client
+RUN apk update && apk add --no-cache mariadb-client tzdata
 
 WORKDIR /app
 
